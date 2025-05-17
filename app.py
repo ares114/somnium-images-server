@@ -16,6 +16,20 @@ TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY", "2fe622d88e8c8c3ebb51a96188f6e6
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
 
+# Token validation - simple security measure
+VALID_TOKEN = "3aff4c3a-83a4-4000-9ce1-5449c4ce0216"
+
+@app.before_request
+def validate_token():
+    # Skip token validation for health check
+    if request.path == '/health':
+        return None
+        
+    # Check for token in query params or headers
+    token = request.args.get('token')
+    if not token or token != VALID_TOKEN:
+        return jsonify({"success": False, "error": "Invalid or missing token"}), 403
+
 @app.route('/generate-image', methods=['POST'])
 def generate_image():
     try:
