@@ -1,9 +1,10 @@
 from flask import Flask, request, jsonify
-from together import Together
 import os
 from dotenv import load_dotenv
 from flask_cors import CORS
 import base64
+import requests
+import json
 
 # Load environment variables
 load_dotenv()
@@ -14,9 +15,6 @@ TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY", "2fe622d88e8c8c3ebb51a96188f6e6
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
-
-# Initialize Together client
-client = Together(api_key=TOGETHER_API_KEY)
 
 @app.route('/generate-image', methods=['POST'])
 def generate_image():
@@ -45,17 +43,40 @@ def generate_image():
         
         print(f"Generating image with prompt: {enhanced_prompt[:100]}...")
         
-        # Generate image using Together API
-        response = client.images.generate(
-            prompt=enhanced_prompt,
-            model="black-forest-labs/FLUX.1-schnell-Free",
-            steps=10,
-            n=1
+        # Call Together API directly using requests
+        headers = {
+            "Authorization": f"Bearer {TOGETHER_API_KEY}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": "black-forest-labs/FLUX.1-schnell-Free",
+            "prompt": enhanced_prompt,
+            "steps": 10,
+            "n": 1
+        }
+        
+        response = requests.post(
+            "https://api.together.xyz/v1/images/generations",
+            headers=headers,
+            json=payload
         )
         
-        # Get image data
-        image_url = response.data[0].url
-        image_b64 = response.data[0].b64_json
+        if response.status_code != 200:
+            print(f"API Error: {response.status_code}, {response.text}")
+            return jsonify({
+                "success": False,
+                "error": f"Together API error: {response.status_code}"
+            }), 500
+        
+        # Parse the response
+        response_data = response.json()
+        print(f"API response: {json.dumps(response_data)[:100]}...")
+        
+        # Get the image data
+        image_data = response_data.get("data", [])[0]
+        image_url = image_data.get("url", "")
+        image_b64 = image_data.get("b64_json", "")
         
         # Return both URL and base64 data
         return jsonify({
